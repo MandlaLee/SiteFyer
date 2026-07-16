@@ -1,0 +1,17 @@
+{
+  "name": "SiteFyer",
+  "short_name": "SiteFyer",
+  "description": "Mirror public websites into resumable offline ZIP archives.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080809",
+  "theme_color": "#0b0b0c",
+  "icons": [
+    {
+      "src": "assets/icons/sitefyer.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
