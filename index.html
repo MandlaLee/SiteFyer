@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0c">
+  <meta name="description" content="SiteFyer mirrors public websites into resumable offline ZIP archives.">
+  <title>SiteFyer — Mirror public websites</title>
+  <link rel="icon" href="assets/icons/sitefyer.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to workspace</a>
+
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="SiteFyer home">
+      <span class="brand-mark" aria-hidden="true">SF</span>
+      <span>
+        <strong>SiteFyer</strong>
+        <small>Mirror Mode · V1</small>
+      </span>
+    </a>
+    <div class="network-pill" id="networkPill" data-online="true">
+      <span class="network-dot" aria-hidden="true"></span>
+      <span id="networkText">Online</span>
+    </div>
+  </header>
+
+  <main id="workspace" class="workspace">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">THE FYER ECOSYSTEM</p>
+      <h1 id="hero-title">Save the whole public website. Not only the homepage.</h1>
+      <p class="hero-copy">
+        SiteFyer discovers internal pages, counts the complete public file set, downloads it with resumable checkpoints, rewrites local links and packages the mirror as one ZIP.
+      </p>
+    </section>
+
+    <section class="panel setup-panel" aria-labelledby="setup-title">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">NEW MIRROR</p>
+          <h2 id="setup-title">Choose a public website</h2>
+        </div>
+        <span class="phase-chip">Scan → Count → Download → ZIP</span>
+      </div>
+
+      <form id="mirrorForm" novalidate>
+        <label class="field field-wide" for="sourceUrl">
+          <span>Website URL</span>
+          <div class="url-control">
+            <input id="sourceUrl" name="sourceUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com" required>
+            <button class="button button-primary" id="scanButton" type="submit">Scan whole website</button>
+          </div>
+          <small>Only public HTTP/HTTPS pages and files are supported.</small>
+        </label>
+
+        <details class="advanced-options">
+          <summary>Mirror options</summary>
+          <div class="options-grid">
+            <label class="toggle-row">
+              <input id="respectRobots" type="checkbox" checked>
+              <span>
+                <strong>Respect robots.txt</strong>
+                <small>Recommended for public-site crawling.</small>
+              </span>
+            </label>
+
+            <label class="toggle-row">
+              <input id="includeSubdomains" type="checkbox">
+              <span>
+                <strong>Include subdomain pages</strong>
+                <small>Assets from CDNs are still included automatically.</small>
+              </span>
+            </label>
+
+            <label class="toggle-row">
+              <input id="includeExternalAssets" type="checkbox" checked>
+              <span>
+                <strong>Download external assets</strong>
+                <small>Fonts, scripts and media referenced by the site.</small>
+              </span>
+            </label>
+
+            <label class="field">
+              <span>Concurrent downloads</span>
+              <input id="concurrency" type="number" min="1" max="8" value="3">
+            </label>
+
+            <label class="field">
+              <span>Delay between requests (ms)</span>
+              <input id="requestDelay" type="number" min="0" max="10000" step="100" value="150">
+            </label>
+
+            <label class="field">
+              <span>Request timeout (seconds)</span>
+              <input id="requestTimeout" type="number" min="5" max="180" value="35">
+            </label>
+
+            <label class="field">
+              <span>Maximum pages</span>
+              <input id="maxPages" type="number" min="0" value="0">
+              <small>0 means no set limit.</small>
+            </label>
+
+            <label class="field">
+              <span>Maximum total files</span>
+              <input id="maxFiles" type="number" min="0" value="0">
+              <small>0 means no set limit.</small>
+            </label>
+
+            <label class="field">
+              <span>Maximum link depth</span>
+              <input id="maxDepth" type="number" min="0" value="0">
+              <small>0 means no set limit.</small>
+            </label>
+
+            <label class="field field-wide">
+              <span>Optional custom CORS proxy</span>
+              <input id="customProxy" type="text" placeholder="https://proxy.example/?url={url}">
+              <small>Use <code>{url}</code> where the encoded target URL should be inserted. SiteFyer tries direct access and built-in fallbacks first unless a custom proxy is supplied.</small>
+            </label>
+          </div>
+        </details>
+      </form>
+
+      <div class="browser-note" role="note">
+        <strong>Browser limitation:</strong> GitHub Pages cannot directly read most unrelated websites because browsers enforce cross-origin rules. SiteFyer rotates through compatible fetch routes and supports your own proxy. Large or heavily protected sites may require a dedicated proxy later.
+      </div>
+    </section>
+
+    <section class="panel resume-panel" id="resumePanel" hidden aria-labelledby="resume-title">
+      <div>
+        <p class="eyebrow">RECOVERED CHECKPOINT</p>
+        <h2 id="resume-title">An unfinished mirror was found</h2>
+        <p id="resumeDescription">Continue from the last saved file instead of starting again.</p>
+      </div>
+      <div class="button-row">
+        <button class="button button-primary" id="resumeSavedButton" type="button">Resume mirror</button>
+        <button class="button button-secondary" id="discardSavedButton" type="button">Discard checkpoint</button>
+      </div>
+    </section>
+
+    <section class="panel progress-panel" id="progressPanel" hidden aria-live="polite">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow" id="phaseEyebrow">SCANNING</p>
+          <h2 id="phaseTitle">Discovering the complete website</h2>
+          <p id="phaseDescription">Following internal links, sitemaps, stylesheets and referenced assets.</p>
+        </div>
+        <span class="status-badge" id="statusBadge">Working</span>
+      </div>
+
+      <div class="progress-track" aria-label="Job progress">
+        <span id="progressBar" style="width: 0%"></span>
+      </div>
+
+      <div class="stats-grid">
+        <article>
+          <span>Total files</span>
+          <strong id="totalFilesStat">0</strong>
+        </article>
+        <article>
+          <span>HTML pages</span>
+          <strong id="pagesStat">0</strong>
+        </article>
+        <article>
+          <span>Downloaded</span>
+          <strong id="downloadedStat">0</strong>
+        </article>
+        <article>
+          <span>Remaining</span>
+          <strong id="remainingStat">0</strong>
+        </article>
+        <article>
+          <span>Failed</span>
+          <strong id="failedStat">0</strong>
+        </article>
+        <article>
+          <span>Stored</span>
+          <strong id="bytesStat">0 B</strong>
+        </article>
+      </div>
+
+      <div class="countdown-card" id="countdownCard" hidden>
+        <div>
+          <p class="eyebrow">COUNT COMPLETE</p>
+          <h3><span id="countedFilesText">0 files</span> discovered</h3>
+          <p>Download begins in <strong id="countdownNumber">5</strong> seconds.</p>
+        </div>
+        <div class="button-row">
+          <button class="button button-primary" id="downloadNowButton" type="button">Download now</button>
+          <button class="button button-secondary" id="cancelCountdownButton" type="button">Pause before download</button>
+        </div>
+      </div>
+
+      <div class="job-controls">
+        <button class="button button-secondary" id="pauseButton" type="button">Pause</button>
+        <button class="button button-primary" id="continueButton" type="button" hidden>Continue</button>
+        <button class="button button-danger" id="cancelButton" type="button">Cancel job</button>
+      </div>
+
+      <div class="activity-shell">
+        <div class="activity-heading">
+          <h3>Activity</h3>
+          <button class="text-button" id="clearLogButton" type="button">Clear visible log</button>
+        </div>
+        <ol class="activity-log" id="activityLog"></ol>
+      </div>
+    </section>
+
+    <section class="panel completed-panel" id="completedPanel" hidden aria-labelledby="completed-title">
+      <div>
+        <p class="eyebrow">MIRROR READY</p>
+        <h2 id="completed-title">Your complete ZIP is ready</h2>
+        <p id="completedSummary">The public website mirror and crawl manifest have been packaged.</p>
+      </div>
+      <div class="button-row">
+        <button class="button button-primary" id="saveZipButton" type="button">Save ZIP again</button>
+        <button class="button button-secondary" id="newMirrorButton" type="button">Mirror another site</button>
+      </div>
+    </section>
+
+    <section class="scope-section" aria-labelledby="scope-title">
+      <div class="scope-heading">
+        <p class="eyebrow">V1 DOWNLOAD SCOPE</p>
+        <h2 id="scope-title">What Mirror Mode captures</h2>
+      </div>
+      <div class="scope-grid">
+        <span>HTML pages</span>
+        <span>CSS</span>
+        <span>JavaScript</span>
+        <span>Images &amp; SVG</span>
+        <span>Fonts</span>
+        <span>Favicons</span>
+        <span>Web manifests</span>
+        <span>PDFs &amp; documents</span>
+        <span>Direct video files</span>
+        <span>CSS <code>url()</code> assets</span>
+        <span><code>srcset</code> &amp; <code>&lt;picture&gt;</code></span>
+        <span>Inline-style assets</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>SiteFyer V1 · Public website Mirror Mode</p>
+    <p>Use responsibly and only on websites you are permitted to archive.</p>
+  </footer>
+
+  <noscript>SiteFyer requires JavaScript.</noscript>
+</body>
+</html>
